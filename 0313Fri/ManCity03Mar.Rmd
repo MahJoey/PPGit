@@ -1,0 +1,158 @@
+---
+title: "ManCity03Mar"
+output:
+  pdf_document:
+    latex_engine: xelatex
+date: "2026-03-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r library}
+library(sf)        # 空间数据读写
+library(dplyr)     # 数据操作
+library(mapview)   # 交互式地图（仅用于中小规模）
+library(spatstat) # 网络数据结构
+library(spatstat.Knet)
+```
+
+```{r networks, include = FALSE}
+cm_boundary <- st_read("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/Manchester/CM_data/cm_boundary.shp")
+roads_manchester <- st_read("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/Manchester/CM_data/roads_manchester.shp")
+```
+
+```{r accidents_Roads}
+acc <- read.csv("~/Desktop/Manchester_OriginalData/STATS19AccDataJan2010Dec2021forGMServers.csv")
+
+acc_sf <- st_as_sf(
+  acc,
+  coords = c("Easting", "Northing"),
+  crs = 27700,
+  remove = FALSE
+)
+#acc2_sf <- acc_sf[acc_sf$NumberCasualties > 1, ]
+
+# sf 道路 → linnet -------------------------------------------------
+net       <- readRDS("Manchester/GM_data/gm_net.rds")
+roads_psp <- readRDS("Manchester/GM_data/gm_roads_psp.rds")
+
+# window ---------------------------------------------------------------------
+gm_win <- as.owin(cm_boundary)
+```
+
+```{r}
+plot(acc_sf)
+```
+
+```{r ClassifyingPoints}
+# classify by Severity(1-3)
+
+pts_sf <- vector( "list", 3)
+XSeverity_manCity <- vector ("list", 3)
+
+
+for (i in seq_len(3)){
+  pts_sf[[i]] <- acc_sf [acc_sf$Severity == i, ]
+  
+  # sf -> ppp（窗口必须是 gm_win）
+  xy <- sf::st_coordinates(pts_sf[[i]])
+  acc_pp <- spatstat.geom::ppp(x = xy[,1], y = xy[,2], window = gm_win, checkdup = FALSE)
+
+  # 投影到最近道路线段（确保点落在网络上）
+  t0 <- as.POSIXct(
+    paste(pts_sf[[i]]$OutputDate, pts_sf[[i]]$OutputTime),
+    format = "%d/%m/%Y %H:%M",
+    tz = "Europe/London"
+  )
+  
+inside <- spatstat.geom::inside.owin(acc_pp$x, acc_pp$y, gm_win)
+acc_pp_in <- acc_pp[inside]
+t_in <- t0[inside]
+
+marks(acc_pp_in) <- data.frame(
+  id   = seq_len(spatstat.geom::npoints(acc_pp_in)),
+  time = t_in
+)
+
+prj <- spatstat.geom::project2segment(acc_pp_in, roads_psp)
+acc_snap <- prj$Xproj
+
+# 看看投影后 marks 还在不在
+m2 <- marks(acc_snap)
+str(m2)
+
+# 若 m2 里包含 time 或 id，就直接用它
+# 例如：
+# t_keep <- m2$time
+# 或者 t_keep <- t_in[m2$id]
+}
+
+
+```
+
+severity = 1 npoints = 649 reject 512
+
+severity = 2 npoints = 7201 reject 5503
+
+severity = 3 npoints = 37776 reject 27984
+
+```{r SAVEtheX}
+dir.create("CM_data", showWarnings = FALSE)
+
+# save
+saveRDS(XSeverity_manCity, file = "CM_data/XSeverity_manCity.rds")
+```
+
+```{r}
+xy <- sf::st_coordinates(pts_sf[[1]])
+acc_pp <- spatstat.geom::ppp(x = xy[,1], y = xy[,2], window = gm_win, checkdup = FALSE)
+
+plot(xy, col = 'red', cex=0.15)
+plot(XSeverity_manCity[[1]], add = TRUE, col = "blue", cex=0.15)
+```
+
+```{r Viewingpp, fig.width=10, fig.height=6, dpi=600, dev="pdf"}
+
+cols <- adjustcolor(grDevices::hcl.colors(3, "Dark 3"), alpha.f = 0.3)
+
+for(i in rev(seq_len(3))){
+  if (i==3){
+    plot(XSeverity_manCity[[i]], main = 'events with different severity', legend = FALSE, col = cols[i], cex=0.15)
+  }
+    else{
+      plot(XSeverity_manCity[[i]], add = TRUE, legend = FALSE, col = cols[i], cex=0.15)
+    }
+}
+
+legend("topleft",
+       legend = paste0("Severity=", 3:1),
+       col = cols, lwd = 2, bty = "n")
+
+```
+
+```{r Kfunction}
+
+
+cols <- adjustcolor(grDevices::hcl.colors(3, "Dark 3"), alpha.f = 0.2)
+r_grid <- seq(0, 2000, length = 101) # meter
+
+for(i in seq_len(3)){
+  
+  if (i==1){
+    Kb <- Knet(XSeverity_manCity[[i]], r = r_grid)
+    plot(Kb, legend = FALSE, lwd = 2, col = cols[i], main = "")
+  }
+    else{
+     # Kb <- Knet(XSeverity_manCity[[i]], r = r_grid)
+     # plot(Kb, add = TRUE, legend = FALSE, lwd = 2, col = cols[i], main = "")
+    }
+}
+
+legend("topleft",
+       legend = paste0("Severity=", 1:3),
+       col = cols, lwd = 2, bty = "n")
+```
+
+XSeverity[[3]] is too large too knit...

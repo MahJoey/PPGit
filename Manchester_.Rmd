@@ -1,0 +1,151 @@
+---
+title: "Manchester_attempt"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+date: "2026-03-06"
+---
+
+## Package
+
+```{r}
+if (!require("spatstat.Knet")) {
+  # Install the latest version of the package
+  install.packages("spatstat.Knet_1.11-0.tar.gz", repos = NULL, type = "source")
+  if (!require("spatstat.Knet")) 
+    stop("Unable to install package")
+} else requireversion(spatstat.Knet, "1.11-0")
+
+library(spatstat.geom)
+library(spatstat.linnet)
+library(spatstat)
+library(sf)        # 
+library(dplyr)     # 
+```
+
+## Including Plots
+
+```{r}
+## Manchester data
+X_manCity <- readRDS("Manchester/CM_data/X_manCity.rds")
+
+GBR4 <- st_read("gadm41_GBR/gadm41_GBR_4.shp")
+# loading the GADM 
+
+
+GBR4_trans <- st_transform(GBR4, 27700)   # unit:meter
+
+plot(st_geometry(GBR4_trans), col = "grey95", border = "grey70")
+plot(X_manCity, add = TRUE, col = "red", lwd = 0.8)
+
+```
+
+```{r}
+W <- as.owin(domain(X_manCity))
+W
+X_manCity
+```
+
+```{r}
+r <- seq(0, 2000, length = 20)
+
+K_hom_manCity <- Knet(X_manCity, r = r)
+plot(K_hom_manCity, main = "Homogeneous K on Linear Network", legend = FALSE, lwd = 2)
+```
+
+## Manchester CI
+
+```{r}
+L <- domain(X_manCity)      # 例如从已存在的 lpp 提取线网
+r_grid <- seq(0, 2000, length = 101) # meter
+
+# 叠加绘制 i 次 K 函数
+B    <- 10                                # 重复次数（改成你要的 i）
+n0   <- 250                               # 每次模拟的点数
+cols <- grDevices::hcl.colors(B, "Dark 3")
+
+for (b in seq_len(B)) {
+  X_sim   <- runiflpp(n0, L)              # 若想随次数递增，用 n0 * b
+  Kb      <- Knet(X_sim, r = r_grid)$est
+
+  if (b == 1) {
+    kfuns1 <- c()
+    kfuns1 <- cbind(kfuns1,Kb)
+    #plot(Kb, legend = FALSE, lwd = 2, col = cols[b], main = "")
+  } else {
+    kfuns1 <- cbind(kfuns1,Kb)
+    #plot(Kb, add = TRUE, legend = FALSE, lwd = 2, col = cols[b])
+  }
+}
+
+qts <- apply(kfuns1, 1, quantile, probs = c(0.025, 0.975))
+
+
+plot(NULL, xlab = "r", ylab = "Estimated K function", xlim = range(r_grid), ylim = range(kfuns1))
+
+polygon(c(r_grid, rev(r_grid)), c(qts[1, ], rev(qts[2, ])), col = "lightgrey", border = NA)
+
+plot(Knet(X_manCity, r = r_grid), add = TRUE, legend = FALSE, lwd = 2)
+```
+
+```{r}
+
+X <- X_manCity
+W <- as.owin(domain(X))
+
+nx <- 3; ny <- 3
+xbreak <- seq(W$xrange[1], W$xrange[2], length.out = nx + 1)
+ybreak <- seq(W$yrange[1], W$yrange[2], length.out = ny + 1)
+
+
+plot(X, main="X_manCity with grid", axes=TRUE)
+
+# 画分割线
+abline(v = xbreak, h = ybreak, col="grey60", lty=2)
+
+```
+
+```{r}
+
+k <- 0
+X_sub <- vector("list", nx * ny)
+r_grid <- seq(0, 2000, length = 101) # meter
+
+for(i in seq_len(nx)){
+  for(j in seq_len(ny)){
+    k <- k + 1
+    if(!(k == 7) &&!(k == 3)){
+      Wsub <- owin(xrange = c(xbreak[i], xbreak[i+1]),
+                 yrange = c(ybreak[j], ybreak[j+1]))
+      X_sub[[k]] <- X_manCity[Wsub, clip = TRUE, drop = TRUE]
+      plot(X_sub[[k]], main = paste0('X_sub',k))
+    }
+    
+    if (k == 1) {
+      kfuns1 <- c()
+      Kb <- Knet(X_sub[[k]], r = r_grid)$est
+      kfuns1 <- cbind(kfuns1,Kb)
+      #plot(Kb, legend = FALSE, lwd = 2, col = cols[b], main = "")
+    } else if(!(k == 7) &&!(k == 3)) {
+      Kb <- Knet(X_sub[[k]], r = r_grid)$est
+      kfuns1 <- cbind(kfuns1,Kb)
+      #plot(Kb, add = TRUE, legend = FALSE, lwd = 2, col = cols[b])
+    }
+  }
+}
+```
+
+```{r}
+r_grid <- seq(0, 2000, length = 101) # meter
+cols <- grDevices::hcl.colors(nx * ny, "Dark 3")
+
+for (k in seq_len(9)){
+  if (k == 1) {
+      Kb <- Knet(X_sub[[k]], r = r_grid)
+      plot(Kb, legend = FALSE, lwd = 2, col = cols[k], main = "")
+    } else if(!(k == 7) &&!(k == 3)) {
+      Kb <- Knet(X_sub[[k]], r = r_grid)
+      plot(Kb, add = TRUE, legend = FALSE, lwd = 2, col = cols[k])
+    }
+}
+```

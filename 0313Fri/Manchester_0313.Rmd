@@ -1,0 +1,282 @@
+---
+title: "Manchester_0313"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Library, include = FALSE}
+library(sf)        # 空间数据读写
+library(dplyr)     # 数据操作
+library(mapview)   # 交互式地图（仅用于中小规模）
+library(spatstat) # 网络数据结构
+library(spatstat.Knet)
+```
+
+```{r LoadingData, include=FALSE}
+
+XSeverity_manCity <- readRDS("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data/XSeverity_manCity.rds")
+
+net <- readRDS("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/Manchester/GM_data/gm_net.rds")
+
+cm_boundary <- st_read("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data/cm_boundary.shp")
+
+roads_psp <- readRDS("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/Manchester/GM_data/gm_roads_psp.rds")
+
+acc <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/DataSet/Manchester_OriginalData/STATS19AccDataJan2010Dec2021forGMServers.csv")
+
+acc_sf <- st_as_sf(
+  acc,
+  coords = c("Easting", "Northing"),
+  crs = 27700,
+  remove = FALSE
+)
+
+gm_win <- as.owin(cm_boundary)
+```
+
+```{r pointsAndsave,include=FALSE, cache=TRUE}
+# classify by Severity(1-3)
+
+pts_sf <- vector( "list", 3)
+XSeverity_manCity <- vector ("list", 3)
+
+
+for (i in seq_len(3)){
+  pts_sf[[i]] <- acc_sf [acc_sf$Severity == i, ]
+  
+  # sf -> ppp（窗口必须是 gm_win）
+  xy <- sf::st_coordinates(pts_sf[[i]])
+  acc_pp <- spatstat.geom::ppp(x = xy[,1], y = xy[,2], window = gm_win, checkdup = FALSE)
+
+  # 投影到最近道路线段（确保点落在网络上）
+ 
+  prj <- spatstat.geom::project2segment(acc_pp, roads_psp)
+  acc_snap <- prj$Xproj   # 已经“贴”到道路上的 ppp
+
+  
+  # LNPP
+  L <- net[gm_win, clip = TRUE, drop = TRUE]
+  X <- spatstat.linnet::lpp(acc_snap, L)
+  
+  X
+  XSeverity_manCity[[i]] <- X
+}
+
+
+dir.create("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data", showWarnings = FALSE)
+# save
+saveRDS(XSeverity_manCity, file = "~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data/XSeverity_manCity.rds")
+```
+
+```{r ,fig.width=8, fig.height=6,,dpi = 600, include=FALSE}
+plot(acc_sf)
+
+# 取该对象的网络与窗口
+L <- domain(XSeverity_manCity[[1]])
+
+# 只画网络所在的最小包围矩形（减少空白）
+op <- par(mar=c(1,1,1,1))
+plot(L, main="3 types of accidents on Manchester", col="grey70", lwd=0.4)
+
+plot(as.ppp(XSeverity_manCity[[3]]), add=TRUE, cols="green", pch=16, cex=0.5)
+plot(as.ppp(XSeverity_manCity[[2]]), add=TRUE, cols="blue", pch=16, cex=0.5)
+plot(as.ppp(XSeverity_manCity[[1]]), add=TRUE, cols="red", pch=16, cex=0.5)
+
+par(op)
+```
+
+```{r Boundary, include=FALSE}
+X <- XSeverity_manCity[[1]]
+W <- as.owin(domain(X))
+
+
+xbreak <- seq(W$xrange[1], W$xrange[2], length.out = 4)
+ybreak <- seq(W$yrange[1], W$yrange[2], length.out = 5)
+
+plot(X, main="X_manCity with grid", axes=TRUE)
+
+# 画分割线
+abline(v = xbreak, h = ybreak, col="grey60", lty=2)
+```
+
+```{r subnetwork,fig.width=8, fig.height=6,,dpi = 600}
+Wsub <- owin(xrange = c(382000, xbreak[3]),
+                 yrange = c(395000, ybreak[4]))
+
+X_sub <- vector("list", 3) # X_sub
+for (i in seq_len(3)){
+  X_sub[[i]] <- XSeverity_manCity[[i]][Wsub, clip = TRUE, drop = TRUE]
+}
+
+
+dir.create("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data", showWarnings = FALSE)
+# save
+saveRDS(XSeverity_manCity, file = "~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data/X_sub.rds")
+
+
+# 取该对象的网络与窗口
+L <- domain(X_sub[[1]])
+
+op <- par(mar=c(1,1,1,1))
+plot(L, main="Accident with different severity on Manchester city center", col="grey70", lwd=0.4)
+
+
+plot(as.ppp(X_sub[[3]]), add=TRUE, cols="green", pch=16, cex=0.5)
+plot(as.ppp(X_sub[[2]]), add=TRUE, cols="blue", pch=16, cex=0.5)
+plot(as.ppp(X_sub[[1]]), add=TRUE, cols="red", pch=16, cex=0.5)
+
+
+
+usr <- par("usr")  # c(xmin, xmax, ymin, ymax)
+
+x0 <- usr[1] + 0.08*(usr[2]-usr[1])
+y0 <- usr[3] + 0.08*(usr[4]-usr[3])
+
+sb <- spatstat.geom::yardstick(
+  x0 = x0, y0 = y0,
+  x1 = x0 + 1000, y1 = y0,   # 1000m measuring scale
+  txt = "1000 m"
+)
+
+plot(sb, add = TRUE)
+
+par(op)
+```
+
+```{r K in networksubset,include=FALSE, cache=TRUE}
+
+
+cols <- adjustcolor(grDevices::hcl.colors(3, "Dark 3"), alpha.f = 0.2)
+r_grid <- seq(0, 5000, length = 101) # meter
+
+for(i in seq_len(3)){
+  
+  if (i==1){
+    Kb <- Knet(X_sub[[i]], r = r_grid)
+    plot(Kb, legend = FALSE, lwd = 2, col = cols[i], main = "")
+  }
+    else {
+     Kb <- Knet(X_sub[[i]], r = r_grid)
+     plot(Kb, add = TRUE, legend = FALSE, lwd = 2, col = cols[i], main = "")
+    }
+}
+
+legend("topleft",
+       legend = paste0("Severity=", 1:3),
+       col = cols, lwd = 2, bty = "n")
+```
+
+```{r linearKcross, fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+X1 <- unmark(X_sub[[1]])
+X2 <- unmark(X_sub[[2]])
+X3 <- unmark(X_sub[[3]])
+
+
+Y <- superimpose(sev1 = X1, sev2 = X2, sev3 = X3)
+# make sure the marks are factors
+marks(Y) <- factor(marks(Y), levels = c("sev1","sev2","sev3"))
+
+table(marks(Y))
+
+r_grid <- seq(0, 5000, length=101)
+
+K12 <- linearKcross(Y, i="sev1", j="sev2", r=r_grid)
+K21 <- linearKcross(Y, i="sev2", j="sev1", r=r_grid)
+K13 <- linearKcross(Y, i="sev1", j="sev3", r=r_grid)
+K31 <- linearKcross(Y, i="sev3", j="sev1", r=r_grid)
+K23 <- linearKcross(Y, i="sev2", j="sev3", r=r_grid)
+K32 <- linearKcross(Y, i="sev3", j="sev2", r=r_grid)
+
+```
+
+```{r}
+mean(nndist(X1))
+Window(X1)
+W1 <- boundingbox(X1)
+W1
+```
+
+```{r}
+
+```
+
+```{r}
+plot(K12, legend=FALSE, ylab = "Kcross(r)", lwd=2, col="red", main="Cross-K btw 1-2 on network")
+plot(K21,add=TRUE, legend=FALSE, lwd=2, col="blue")
+legend("topleft",
+       legend=c("K12","K21"),
+       col=c("red","blue"), lwd=2, bty="n")
+
+plot(K13, legend=FALSE, ylab = "Kcross(r)", lwd=2, col="red", main="Cross-K btw 1-3 on network")
+plot(K31, add=TRUE, legend=FALSE, lwd=2, col="blue")
+legend("topleft",
+       legend=c("K13","K31"),
+       col=c("red","blue"), lwd=2, bty="n")
+
+plot(K23, legend=FALSE, ylab = "Kcross(r)", lwd=2, col="red", main="Cross-K btw 2-3 on network")
+
+plot(K32, add=TRUE, legend=FALSE, lwd=2, col="blue")
+legend("topleft",
+       legend=c("K23","K32"),
+       col=c("red","blue"), lwd=2, bty="n")
+```
+
+```{r}
+
+d12 <- K12$est - K12$r
+d21 <- K21$est - K21$r
+d13 <- K13$est - K13$r
+d31 <- K31$est - K31$r
+d23 <- K23$est - K23$r
+d32 <- K32$est - K32$r
+
+op <- par(no.readonly = TRUE)
+par(mar = c(5, 5, 4, 6), xpd = NA)  # bigger margin
+
+
+plot(K12$r, d12, type="l", ylab="K_ij - Kpois", xlab="r")
+lines(K21$r, d21, lty=2, col = "black")
+
+lines(K13$r, d13, lty=1, col = "red")   # 
+#lines(K31$r, d31, lty=2, col = "red") 
+
+lines(K23$r, d23, lty = 1, col = "blue")
+lines(K32$r, d32, lty = 2, col = "blue")
+
+lines(K12$r, K12$r-K23$r, lty = 2, col = "gray")
+
+legend("topright", inset = c(-0.33, 0),
+       legend = c("D12", "D21",
+                  
+                  "D13", "D31",
+                  
+                  "D23", "D32",
+
+                  "baseline"),
+
+       col    = c("black","black","red","red","blue","blue","grey70"),
+
+       lty    = c(1,2,1,2,1,2,2),
+
+       bty    = "n")
+
+```
+
+```{r}
+# K12in <- linearKcross.inhom(Y, i="sev1", j="sev2",lambdaI=NULL, lambdaJ=NULL, r=r_grid)
+# K13in <- linearKcross.inhom(Y, i="sev1", j="sev3",lambdaI=NULL, lambdaJ=NULL, r=r_grid)
+# K23in <- linearKcross.inhom(Y, i="sev2", j="sev3",lambdaI=NULL, lambdaJ=NULL, r=r_grid)
+# 
+# plot(K12in, legend=FALSE, ylab = "Kincross(r)", lwd=2, main="Cross-K on network")
+# plot(K13in, add=TRUE, legend=FALSE, lwd=2, col="blue")
+# plot(K23in, add=TRUE, legend=FALSE, lwd=2, col="red")
+# legend("topleft",
+#        legend=c("K12in","K13in","K23in"),
+#        col=c("black","blue","red"), lwd=2, bty="n")
+
+```

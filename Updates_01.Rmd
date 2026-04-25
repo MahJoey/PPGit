@@ -1,0 +1,171 @@
+---
+output: pdf_document
+---
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+## WA K-function
+
+```{r}
+if (!require("spatstat.Knet")) {
+  # Install the latest version of the package
+  install.packages("spatstat.Knet_1.11-0.tar.gz", repos = NULL, type = "source")
+  if (!require("spatstat.Knet")) 
+    stop("Unable to install package")
+} else requireversion(spatstat.Knet, "1.11-0")
+
+library(spatstat.geom)
+library(spatstat.linnet)
+library(spatstat)
+library(sf)        # 
+library(dplyr)     # 
+
+# Data Loading -----------------------------------------------------------------
+data("wacrashes", package = "spatstat.Knet")
+X_sub1 <- readRDS("Rakshit/WAsub_data/X_sub.rds")
+X_sub2 <- readRDS("Rakshit/WAsub_data2/X_sub.rds")
+```
+
+### 1. Projection
+
+Firstly, I considered the unit and the projection of the selected area.
+
+```{r}
+W <- as.owin(domain(wacrashes))
+W1 <- as.owin(domain(X_sub1))
+W2 <- as.owin(domain(X_sub2))
+W$xrange ; W$yrange
+W1$xrange ; W1$yrange
+W2$xrange ; W2$yrange
+```
+
+And i think there is no problem about the projection.
+
+### 2. Calculating function
+
+I compared the K-function calculated by Knet with by linearK.
+
+```{r}
+# r_grid <- seq(0, 1000, length = 20) # meter
+# Khom1 <- Knet(X_sub1,r = r_grid)
+# 
+# plot(Khom1, legend = FALSE, lwd = 2, main = "")
+```
+
+```{r}
+r_grid <- seq(0, 10000, length = 100) # meter
+Khom2 <- Knet(X_sub2,r = r_grid)
+
+plot(Khom2, legend = FALSE, lwd = 2, main = "")
+
+plot(linearK(X_sub2,correction="none"))
+plot(linearK(X_sub2), add = TRUE)
+plot(linearK(X_sub2))
+```
+
+It means the issue is not caused by Knet or the issue exists in both two function.
+
+```{r}
+r_grid <- seq(0, 10000, length = 100) # meter
+Khom2 <- Knet(X_sub2,r = r_grid)
+
+plot(Khom2, legend = FALSE, lwd = 2, main = "")
+```
+
+### 3.GADM
+
+```{r}
+AUS2 <- st_read("gadm41_AUS/gadm41_AUS_2.shp")
+# loading the GADM 
+
+WA <- subset(AUS2, NAME_1 %in% c("Western Australia","Western Australia (state)"))
+
+#Projection : 28350
+WA_mga50 <- st_transform(WA, 28350)   # unit:meter
+AUS2_mga50 <- st_transform(AUS2, 28350)   # unit:meter
+
+plot(st_geometry(AUS2_mga50), col = "grey95", border = "grey70")
+plot(X_sub2, add = TRUE, col = "black", lwd = 0.8)
+plot(X_sub1, add = TRUE, col = "red", lwd = 0.8)
+
+plot(st_geometry(WA_mga50), col = "grey95", border = "grey70")
+plot(X_sub2, add = TRUE, col = "black", lwd = 0.8)
+plot(X_sub1, add = TRUE, col = "red", lwd = 0.8)
+```
+
+It looks very close to Perth’s real location . But the data 'wacrashes' don't mention the projection it used, so i don't know if there is a projection more accurate.
+
+But it might mean the K-function issue not be caused by map size.
+
+Then I consider to separate the X_sub2 into smaller area and test the K-function.
+
+### 4.Smaller area test
+
+```{r}
+W2$xrange ; W2$yrange
+
+xr <- W2$xrange; yr <- W2$yrange
+xmid <- xr[1] + 0.45*(xr[2] - xr[1])
+W_left  <- owin(xrange = c(xr[1], xmid), yrange = yr)
+W_right <- owin(xrange = c(xmid,   xr[2]), yrange = yr)
+
+X_left  <- X_sub2[W_left,  clip = TRUE, drop = TRUE]
+X_right <- X_sub2[W_right, clip = TRUE, drop = TRUE]
+
+plot(X_left); plot(X_right)
+```
+
+```{r}
+r_grid <- seq(0, 50000, length = 100) # meter
+Khom_L <- Knet(X_left,r = r_grid)
+Khom_R <- Knet(X_right,r = r_grid)
+
+plot(Khom_L, legend = FALSE, lwd = 2, main = "")
+#plot(Khom_R, legend = FALSE, lwd = 2, main = "")
+```
+
+### 5. Adding points test
+
+```{r}
+L  <- domain(X_sub2) 
+X_sim  <- runiflpp(400, L)             # npoints(X_sub2) = 72 
+X_sub2plus  <- superimpose(X_sub2, X_sim)
+
+r_grid <- seq(0, 1000, length = 100) # meter
+Khom_sim <- Knet(X_sub2plus,r = r_grid)
+
+plot(Khom_sim, legend = FALSE, lwd = 2, main = "")
+```
+
+So I still think the reason why the X_sub2's K-function goes high sharply is the clustering in the lower central part of X_sub2. I think next step is to understand the correction the Knet function did.
+
+## Manchester GADM
+
+```{r}
+## Manchester data
+X_manCity <- readRDS("Manchester/CM_data/X_manCity.rds")
+
+GBR4 <- st_read("gadm41_GBR/gadm41_GBR_4.shp")
+# loading the GADM 
+
+
+GBR4_trans <- st_transform(GBR4, 27700)   # unit:meter
+
+plot(st_geometry(GBR4_trans), col = "grey95", border = "grey70")
+plot(X_manCity, add = TRUE, col = "red", lwd = 0.8)
+
+# r <- seq(0, 1000, length = 20)
+# 
+# K_hom_manCity <- Knet(X_manCity, r = r)
+# plot(K_hom_manCity, main = "Homogeneous K on Linear Network", legend = FALSE, lwd = 2)
+```
+
+```{r}
+library(spatstat.geom)
+library(spatstat.linnet)
+library(spatstat)
+library(sf)        # 
+library(dplyr)     # 
+```

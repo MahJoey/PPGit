@@ -1,0 +1,81 @@
+---
+title: "PlanarTry"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+date: "2026-03-11"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Library, include = FALSE}
+library(sf)        # 空间数据读写
+library(dplyr)     # 数据操作
+library(mapview)   # 交互式地图（仅用于中小规模）
+library(spatstat) # 网络数据结构
+library(spatstat.Knet)
+```
+
+spatstat 自带不少\*\*平面点模式（ppp）\*\*示例数据，你可以直接 data() 载入并用 class()/summary() 确认类型。 常用的一些（大多是 ppp）：
+
+cells：生物细胞位置（经典示例）
+
+redwood：红杉树位置
+
+hamster：仓鼠（或巢穴/活动点）位置类数据示例 amacrine：视网膜神经细胞（常用于双类型/标记）
+
+finpines：芬兰松树（森林学经典数据）
+
+swedishpines：瑞典松树
+
+longleaf：长叶松
+
+nztrees：新西兰树木
+
+ponderosa：黄松
+
+bei：北京空气污染相关的空间点数据（配套有 window/marks 结构）
+
+```{r ,fig.width=8, fig.height=6,,dpi = 600}
+
+
+# 载入一个并检查
+data("redwood")
+class(redwood)      # 常见是 "ppp"
+summary(redwood)
+plot(redwood, main = "Planar Point Pattern Example: Redwood")
+plot(Kest(redwood),main = "")
+```
+
+```{r ,fig.width=8, fig.height=6,,dpi = 600}
+data("wacrashes", package = "spatstat.Knet")
+plot(wacrashes, cols = "red", cex = 0.5, main = " ")
+
+
+
+### Reproduce the homogeneous K-function in Figure 18
+#r_grid <- seq(0, 800, length = 101)
+#Khom <- Knet(wacrashes, r = r_grid)
+#plot(Khom, legend = FALSE, lwd = 2, main = " ")
+
+
+
+
+X <- unmark(chicago)
+plot(unmark(chicago), cols = "blue", pch = 16, main = " ")
+fit <- lppm(X ~ polynom(x, y, 2))
+plot(linearKinhom(X, fit),main = "")
+```
+
+```{r ,fig.width=8, fig.height=6,,dpi = 600}
+
+load("/Users/Joey_Mac/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/Rakshit/waCrashIntensity.rda")
+load("/Users/Joey_Mac/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/Rakshit/waCrashIntensityAdaptive.rda")
+
+plot(waCrashIntensity, log = TRUE, main = " ")
+plot(waCrashIntensityAdaptive, log = TRUE, main = " ")
+
+
+```
