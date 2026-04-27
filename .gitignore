@@ -1,9 +1,3 @@
-.R
-.Rmd
-.tex
-.bib
-.scripts
-
 .DS_Store
 .Rhistory
 .RData
