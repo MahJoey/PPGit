@@ -1,0 +1,37 @@
+---
+title: "Manchester_Multitype"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Library, include = FALSE}
+library(sf)        # 空间数据读写
+library(dplyr)     # 数据操作
+library(mapview)   # 交互式地图（仅用于中小规模）
+library(spatstat) # 网络数据结构
+library(spatstat.Knet)
+```
+
+```{r LoadingData, include=FALSE}
+
+XSeverity_manCity <- readRDS("~/0313Fri/CM_data/XSeverity_manCity.rds")
+
+net <- readRDS("~/Manchester/GM_data/gm_net.rds")
+
+cm_boundary <- st_read("~/0313Fri/CM_data/cm_boundary.shp")
+
+roads_psp <- readRDS("~/Manchester/GM_data/gm_roads_psp.rds")
+
+acc <- read.csv("~/DataSet/Manchester_OriginalData/STATS19AccDataJan2010Dec2021forGMServers.csv")
+
+acc_sf <- st_as_sf(
+  acc,
+  coords = c("Easting", "Northing"),
+  crs = 27700,
+  remove = FALSE
+)
+
+gm_win <- as.owin(cm_boundary)
+```

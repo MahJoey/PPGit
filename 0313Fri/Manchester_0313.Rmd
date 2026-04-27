@@ -19,15 +19,15 @@ library(spatstat.Knet)
 
 ```{r LoadingData, include=FALSE}
 
-XSeverity_manCity <- readRDS("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data/XSeverity_manCity.rds")
+XSeverity_manCity <- readRDS("0313Fri/CM_data/XSeverity_manCity.rds")
 
-net <- readRDS("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/Manchester/GM_data/gm_net.rds")
+net <- readRDS("Manchester/GM_data/gm_net.rds")
 
-cm_boundary <- st_read("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data/cm_boundary.shp")
+cm_boundary <- st_read("0313Fri/CM_data/cm_boundary.shp")
 
-roads_psp <- readRDS("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/Manchester/GM_data/gm_roads_psp.rds")
+roads_psp <- readRDS("Manchester/GM_data/gm_roads_psp.rds")
 
-acc <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/DataSet/Manchester_OriginalData/STATS19AccDataJan2010Dec2021forGMServers.csv")
+acc <- read.csv("DataSet/Manchester_OriginalData/STATS19AccDataJan2010Dec2021forGMServers.csv")
 
 acc_sf <- st_as_sf(
   acc,

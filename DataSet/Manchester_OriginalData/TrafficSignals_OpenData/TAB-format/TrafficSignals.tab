@@ -1,0 +1,22 @@
+!table
+!version 450
+!charset WindowsLatin1
+
+Definition Table
+  Type NATIVE Charset "WindowsLatin1"
+  Fields 15
+    FRAS_ref Char (10) ;
+    Description Char (254) ;
+    Type Char (21) ;
+    Controller Char (11) ;
+    BUS_GATE Char (5) ;
+    Easting Integer ;
+    Northing Integer ;
+    Type_Of_Control Char (20) ;
+    Authority Char (20) ;
+    HA_AGENCY_MAINTAINED Char (5) ;
+    Longitude Float ;
+    Latitude Float ;
+    NIS_node Smallint ;
+    COMMENTS Char (250) ;
+    KRN Char (8) ;
