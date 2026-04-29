@@ -182,6 +182,7 @@ table(marks(Y))
 
 r_grid <- seq(0, 2500, length=101)
 
+
 K12 <- linearKcross(Y, i="sev1", j="sev2", r=r_grid)
 K21 <- linearKcross(Y, i="sev2", j="sev1", r=r_grid)
 K13 <- linearKcross(Y, i="sev1", j="sev3", r=r_grid)
@@ -192,6 +193,17 @@ K32 <- linearKcross(Y, i="sev3", j="sev2", r=r_grid)
 ```
 
 ```{r linearKcross, fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+
+# K12 <- linearKcross(Y, i="sev1", j="sev2", r=r_grid)
+# K21 <- linearKcross(Y, i="sev2", j="sev1", r=r_grid)
+# K13 <- linearKcross(Y, i="sev1", j="sev3", r=r_grid)
+# K31 <- linearKcross(Y, i="sev3", j="sev1", r=r_grid)
+# K23 <- linearKcross(Y, i="sev2", j="sev3", r=r_grid)
+# K32 <- linearKcross(Y, i="sev3", j="sev2", r=r_grid)
+
+```
+
+```{r linearKcross, dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
 plot(K12, legend=FALSE, ylab = "Kcross(r)", lwd=2, col="red", main="Cross-K btw 1-2 on network")
 plot(K21,add=TRUE, legend=FALSE, lwd=2, col="blue")
 legend("topleft",
@@ -213,7 +225,7 @@ legend("topleft",
 
 ```
 
-```{r}
+```{r , dev="pdf", fig.width=8, fig.height=6,,dpi = 600}
 
 d12 <- K12$est - K12$r
 d21 <- K21$est - K21$r
