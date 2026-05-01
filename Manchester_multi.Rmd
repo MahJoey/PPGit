@@ -1,5 +1,8 @@
 ---
 title: "Manchester_Multitype"
+output: 
+  pdf_document:
+    latex_engine: xelatex
 ---
 
 ```{r setup, include=FALSE}
@@ -70,7 +73,7 @@ dir.create("0313Fri/CM_data", showWarnings = FALSE)
 saveRDS(XSeverity_manCity, file = "0313Fri/CM_data/XSeverity_manCity.rds")
 ```
 
-```{r ,fig.width=8, fig.height=6,,dpi = 600}
+```{r ,fig.width=8, fig.height=6,,dpi = 600, include=FALSE}
 plot(acc_sf)
 
 # 取该对象的网络与窗口
@@ -87,7 +90,7 @@ plot(as.ppp(XSeverity_manCity[[1]]), add=TRUE, cols="red", pch=16, cex=0.5)
 par(op)
 ```
 
-```{r Boundary,}
+```{r Boundary,include=FALSE}
 X <- XSeverity_manCity[[1]]
 W <- as.owin(domain(X))
 
@@ -97,13 +100,34 @@ ybreak <- seq(W$yrange[1], W$yrange[2], length.out = 5)
 
 plot(X, main="X_manCity with grid", axes=TRUE)
 
-# 画分割线
+# grid
 abline(v = xbreak, h = ybreak, col="grey60", lty=2)
 ```
 
+```{r}
+library(sf)
+
+# （lon, lat）
+pts <- data.frame(
+  name = c("N", "S", "E", "W"),
+  lon  = c(-2.249197, -2.242401, -2.217505, -2.262179),
+  lat  = c(53.489489, 53.469653, 53.476650, 53.477885)
+)
+
+pts_27700 <- st_as_sf(pts, coords = c("lon","lat"), crs = 4326) |>
+  st_transform(27700)
+
+#  points under projection 27700 （Easting, Northing）
+cbind(pts["name"], st_coordinates(pts_27700))
+
+pts_27700
+```
+
 ```{r subnetwork,fig.width=8, fig.height=6,,dpi = 600}
-Wsub <- owin(xrange = c(382000, xbreak[3]),
-                 yrange = c(395000, ybreak[4]))
+# Wsub <- owin(xrange = c(382000, xbreak[3]),
+#                  yrange = c(395000, ybreak[4]))
+Wsub <- owin(xrange = c(382696, 385661),
+                 yrange = c(397018, 399226))
 
 X_sub <- vector("list", 3) # X_sub
 for (i in seq_len(3)){
@@ -111,15 +135,18 @@ for (i in seq_len(3)){
 }
 
 
-dir.create("~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data", showWarnings = FALSE)
+dir.create("0313Fri/CM_data", showWarnings = FALSE)
 # save
-saveRDS(XSeverity_manCity, file = "~/Library/Mobile Documents/com~apple~CloudDocs/Rstudio/0313Fri/CM_data/X_sub.rds")
+saveRDS(XSeverity_manCity, file = "0313Fri/CM_data/X_sub.rds")
 
 
 # 取该对象的网络与窗口
 L <- domain(X_sub[[1]])
 
 op <- par(mar=c(1,1,1,1))
+
+#pdf("Man_map.pdf",width=8, height=6)
+
 plot(L, main="Accident with different severity on Manchester city center", col="grey70", lwd=0.4)
 
 
@@ -143,32 +170,38 @@ sb <- spatstat.geom::yardstick(
 plot(sb, add = TRUE)
 
 par(op)
+
+#dev.off()
 ```
 
-```{r K in networksubset,include=FALSE, cache=TRUE}
-
+```{r K in networksubset,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
 
 cols <- adjustcolor(grDevices::hcl.colors(3, "Dark 3"), alpha.f = 0.2)
-r_grid <- seq(0, 5000, length = 101) # meter
+cols <- c("red","blue","green")
+
+r_grid <- seq(0, 2000, length = 50) # meter
 
 for(i in seq_len(3)){
   
   if (i==1){
     Kb <- Knet(X_sub[[i]], r = r_grid)
+    #pdf("man_K_1.pdf",width=8, height=6)
     plot(Kb, legend = FALSE, lwd = 2, col = cols[i], main = "")
   }
     else {
      Kb <- Knet(X_sub[[i]], r = r_grid)
-     plot(Kb, add = TRUE, legend = FALSE, lwd = 2, col = cols[i], main = "")
+     lines(Kb$r, Kb$est, lty=1, col = cols[i])
     }
 }
 
 legend("topleft",
        legend = paste0("Severity=", 1:3),
        col = cols, lwd = 2, bty = "n")
+
+#dev.off()
 ```
 
-```{r linearKcross, fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+```{r linearKcross,  cache=TRUE}
 X1 <- unmark(X_sub[[1]])
 X2 <- unmark(X_sub[[2]])
 X3 <- unmark(X_sub[[3]])
@@ -180,7 +213,7 @@ marks(Y) <- factor(marks(Y), levels = c("sev1","sev2","sev3"))
 
 table(marks(Y))
 
-r_grid <- seq(0, 2500, length=101)
+r_grid <- seq(0, 2000, length=101)
 
 
 K12 <- linearKcross(Y, i="sev1", j="sev2", r=r_grid)
@@ -189,39 +222,6 @@ K13 <- linearKcross(Y, i="sev1", j="sev3", r=r_grid)
 K31 <- linearKcross(Y, i="sev3", j="sev1", r=r_grid)
 K23 <- linearKcross(Y, i="sev2", j="sev3", r=r_grid)
 K32 <- linearKcross(Y, i="sev3", j="sev2", r=r_grid)
-
-```
-
-```{r linearKcross, fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
-
-# K12 <- linearKcross(Y, i="sev1", j="sev2", r=r_grid)
-# K21 <- linearKcross(Y, i="sev2", j="sev1", r=r_grid)
-# K13 <- linearKcross(Y, i="sev1", j="sev3", r=r_grid)
-# K31 <- linearKcross(Y, i="sev3", j="sev1", r=r_grid)
-# K23 <- linearKcross(Y, i="sev2", j="sev3", r=r_grid)
-# K32 <- linearKcross(Y, i="sev3", j="sev2", r=r_grid)
-
-```
-
-```{r linearKcross, dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
-plot(K12, legend=FALSE, ylab = "Kcross(r)", lwd=2, col="red", main="Cross-K btw 1-2 on network")
-plot(K21,add=TRUE, legend=FALSE, lwd=2, col="blue")
-legend("topleft",
-       legend=c("K12","K21"),
-       col=c("red","blue"), lwd=2, bty="n")
-
-plot(K13, legend=FALSE, ylab = "Kcross(r)", lwd=2, col="red", main="Cross-K btw 1-3 on network")
-plot(K31, add=TRUE, legend=FALSE, lwd=2, col="blue")
-legend("topleft",
-       legend=c("K13","K31"),
-       col=c("red","blue"), lwd=2, bty="n")
-
-plot(K23, legend=FALSE, ylab = "Kcross(r)", lwd=2, col="red", main="Cross-K btw 2-3 on network")
-
-plot(K32, add=TRUE, legend=FALSE, lwd=2, col="blue")
-legend("topleft",
-       legend=c("K23","K32"),
-       col=c("red","blue"), lwd=2, bty="n")
 
 ```
 
@@ -238,6 +238,30 @@ op <- par(no.readonly = TRUE)
 par(mar = c(5, 5, 4, 6), xpd = NA)  # bigger margin
 
 
+
+plot(K12$r, K12$est, type="l", ylab="K_ij - Kpois", xlab="r")
+#lines(K21$r, d21, lty=2, col = "black")
+
+lines(K13$r, K13$est, lty=1, col = "red")   # 
+#lines(K31$r, d31, lty=2, col = "red") 
+
+lines(K23$r, K23$est, lty = 1, col = "blue")
+#lines(K32$r, d32, lty = 2, col = "blue")
+
+lines(K12$r, K12$r, lty = 2, col = "gray")
+
+legend("topleft", inset = c(0, 0),
+       legend = c("K12", 
+                  "K13", 
+                  "K23", 
+                  "baseline"),
+       
+       col    = c("black","red","blue","grey70"),
+       lty    = c(1,1,1,2),
+       bty    = "n")
+
+
+#### D = K - K_pois
 plot(K12$r, d12, type="l", ylab="K_ij - Kpois", xlab="r")
 #lines(K21$r, d21, lty=2, col = "black")
 
@@ -249,19 +273,90 @@ lines(K23$r, d23, lty = 1, col = "blue")
 
 lines(K12$r, K12$r-K23$r, lty = 2, col = "gray")
 
-legend("topright", inset = c(-0.33, 0),
+legend("topleft", inset = c(0, 0),
        legend = c("D12", 
-                  
                   "D13", 
-                  
                   "D23", 
-
                   "baseline"),
-
+       
        col    = c("black","red","blue","grey70"),
-
        lty    = c(1,1,1,2),
-
        bty    = "n")
 
+
+```
+
+### 
+
+```{r random labeling,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+
+# K13 random-labelling envelope
+i_lab <- "sev1"
+j_lab <- "sev3"
+
+B <- 199
+r_grid <- seq(0, 2000, length = 101)
+
+# observasion
+K_obs <- linearKcross(Y, i = i_lab, j = j_lab, r = r_grid)$est
+
+# ----  kfuns1 （simulation）----
+kfuns1 <- NULL
+
+m0 <- marks(Y)  # 
+
+for (b in seq_len(B)) {
+
+  # random labelling: change marks randomly but keep points' location
+  Y_sim <- Y
+  marks(Y_sim) <- sample(m0, replace = FALSE)
+
+  Kb <- linearKcross(Y_sim, i = i_lab, j = j_lab, r = r_grid)$est
+
+  # cbind 
+  if (b == 1) {
+    kfuns1 <- cbind(Kb)
+  } else {
+    kfuns1 <- cbind(kfuns1, Kb)
+  }
+
+  # progress
+  #if (b %% 20 == 0) message("RL sim ", b, "/", B)
+}
+
+qts <- apply(kfuns1, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE)
+
+```
+
+```{r random labeling envolope, dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+# 
+
+#pdf("man_Kcross.pdf",width=8, height=6)
+
+plot(NULL, xlab = "r", ylab = "K-function",
+     xlim = range(r_grid),
+     ylim = range(c(qts, K_obs), na.rm = TRUE))
+
+polygon(c(r_grid, rev(r_grid)),
+        c(qts[1, ], rev(qts[2, ])),
+        col = "lightgrey", border = NA)
+
+#
+k_med  <- apply(kfuns1, 1, median, na.rm = TRUE)
+k_mean <- rowMeans(kfuns1, na.rm = TRUE)
+
+#lines(r_grid, k_med,  lwd = 2, col = "red")
+#lines(r_grid, k_mean, lwd = 2, col = "blue")
+lines(r_grid, K12$est, lwd = 2, col = "black")
+lines(r_grid, K_obs,  lwd = 2, col = "red")
+lines(r_grid, K23$est, lwd = 2, col = "blue")
+lines(K12$r, K12$r, lty = 2, col = "green")
+
+legend("topleft", bty="n",
+       legend=c("K12", "K13", "K23", "K13_95% envelope", "Kpois"),
+       lty=c(1,1,1,1,2),
+       lwd=c(2,2,2,10,2),
+       col=c("black","red","blue","lightgrey","green"),
+       )
+#dev.off()
 ```
