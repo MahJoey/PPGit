@@ -353,10 +353,132 @@ lines(r_grid, K23$est, lwd = 2, col = "blue")
 lines(K12$r, K12$r, lty = 2, col = "green")
 
 legend("topleft", bty="n",
-       legend=c("K12", "K13", "K23", "K13_95% envelope", "Kpois"),
+       legend=c("K12", "K13", "K23", "RandomLabel95% envelope", "Kpois"),
        lty=c(1,1,1,1,2),
        lwd=c(2,2,2,10,2),
        col=c("black","red","blue","lightgrey","green"),
        )
+
 #dev.off()
+```
+
+```{r CSR envolope,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+
+B <- 3
+kfuns12 <- NULL
+kfuns13 <- NULL
+kfuns23 <- NULL
+
+m0 <- marks(Y)  # 
+
+for (b in seq_len(B)) {
+  
+  lambda_hat1 <- npoints(X1) / volume(L)
+  Z_sim1 <- rpoislpp(lambda_hat1, L)
+  lambda_hat2 <- npoints(X2) / volume(L)
+  Z_sim2 <- rpoislpp(lambda_hat2, L)
+  lambda_hat3 <- npoints(X3) / volume(L)
+  Z_sim3 <- rpoislpp(lambda_hat3, L)
+  
+  
+  Kb11 <- Knet(Z_sim1, r = r_grid)$est
+  Kb22 <- Knet(Z_sim2, r = r_grid)$est
+  Kb33 <- Knet(Z_sim3, r = r_grid)$est
+  # cbind 
+  if (b == 1) {
+    kfuns11 <- cbind(Kb11)
+    kfuns22 <- cbind(Kb22)
+    kfuns33 <- cbind(Kb33)
+  } else {
+    kfuns11 <- cbind(kfuns11, Kb11)
+    kfuns22 <- cbind(kfuns22, Kb22)
+    kfuns33 <- cbind(kfuns33, Kb33)
+  }
+
+  # progress
+  #if (b %% 20 == 0) message("RL sim ", b, "/", B)
+}
+
+
+```
+
+```{r}
+## quantile envelopes
+qts11 <- apply(kfuns11, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE)
+qts22 <- apply(kfuns22, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE)
+qts33 <- apply(kfuns33, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE)
+
+K_obs11 <- Knet(X1, r = r_grid)$est
+K_obs22 <- Knet(X2, r = r_grid)$est
+K_obs33 <- Knet(X3, r = r_grid)$est
+
+```
+
+```{r ,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+
+
+## semi-transparent colours
+col11 <- adjustcolor("black", alpha.f = 0.18)
+col22 <- adjustcolor("red",   alpha.f = 0.18)
+col33 <- adjustcolor("blue",  alpha.f = 0.18)
+
+## plot region
+ylim_all <- range(
+  qts11, qts22, qts33,
+  K_obs11, K_obs22, K_obs33,
+  r_grid,
+  na.rm = TRUE
+)
+
+plot(
+  NULL,
+  xlab = "r",
+  ylab = "K-function",
+  xlim = range(r_grid),
+  ylim = ylim_all
+)
+
+## envelopes
+polygon(
+  c(r_grid, rev(r_grid)),
+  c(qts11[1, ], rev(qts11[2, ])),
+  col = col11,
+  border = NA
+)
+
+polygon(
+  c(r_grid, rev(r_grid)),
+  c(qts22[1, ], rev(qts22[2, ])),
+  col = col22,
+  border = NA
+)
+
+polygon(
+  c(r_grid, rev(r_grid)),
+  c(qts33[1, ], rev(qts33[2, ])),
+  col = col33,
+  border = NA
+)
+
+## observed K-functions
+lines(r_grid, K_obs11, col = "black", lwd = 2)
+lines(r_grid, K_obs22, col = "red",   lwd = 2)
+lines(r_grid, K_obs33, col = "blue",  lwd = 2)
+
+## Poisson / random-labelling reference line, if needed
+lines(r_grid, r_grid, lty = 2, lwd = 2)
+
+legend(
+  "topleft",
+  legend = c(
+    "K11 envelope", "K22 envelope", "K33 envelope",
+    "K11 observed", "K22 observed", "K33 observed",
+    "Kpois"
+  ),
+  col = c(col11, col22, col33, "black", "red", "blue", "black"),
+  lwd = c(8, 8, 8, 2, 2, 2, 2),
+  lty = c(1, 1, 1, 1, 1, 1, 2),
+  bty = "n"
+)
+
 ```
