@@ -364,10 +364,10 @@ legend("topleft", bty="n",
 
 ```{r CSR envolope,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
 
-B <- 3
-kfuns12 <- NULL
-kfuns13 <- NULL
-kfuns23 <- NULL
+B <- 30
+kfuns11 <- NULL
+kfuns22 <- NULL
+kfuns33 <- NULL
 
 m0 <- marks(Y)  # 
 
@@ -416,6 +416,8 @@ K_obs33 <- Knet(X3, r = r_grid)$est
 
 ```{r ,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
 
+
+pdf("man_Kiitest.pdf",width=8, height=6)
 
 ## semi-transparent colours
 col11 <- adjustcolor("black", alpha.f = 0.18)
