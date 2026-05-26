@@ -7,6 +7,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+run_heavy <- FALSE
 ```
 
 ```{r Library, include = FALSE}
@@ -15,6 +16,7 @@ library(dplyr)     # 数据操作
 library(mapview)   # 交互式地图（仅用于中小规模）
 library(spatstat) # 网络数据结构
 library(spatstat.Knet)
+
 ```
 
 ```{r LoadingData, include=FALSE}
@@ -174,7 +176,7 @@ par(op)
 #dev.off()
 ```
 
-```{r K in networksubset,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+```{r K in networksubset,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE, eval = run_heavy}
 
 cols <- adjustcolor(grDevices::hcl.colors(3, "Dark 3"), alpha.f = 0.2)
 cols <- c("red","blue","green")
@@ -201,7 +203,7 @@ legend("topleft",
 #dev.off()
 ```
 
-```{r linearKcross,  cache=TRUE}
+```{r linearKcross,  cache=TRUE, eval= run_heavy}
 X1 <- unmark(X_sub[[1]])
 X2 <- unmark(X_sub[[2]])
 X3 <- unmark(X_sub[[3]])
@@ -288,7 +290,7 @@ legend("topleft", inset = c(0, 0),
 
 ### 
 
-```{r random labeling,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+```{r random labeling,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE, eval= run_heavy}
 
 # K13 random-labelling envelope
 i_lab <- "sev1"
@@ -362,7 +364,7 @@ legend("topleft", bty="n",
 #dev.off()
 ```
 
-```{r CSR envolope,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
+```{r CSR envolope,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE, eval= run_heavy}
 
 B <- 30
 kfuns11 <- NULL
@@ -417,7 +419,7 @@ K_obs33 <- Knet(X3, r = r_grid)$est
 ```{r ,dev="pdf", fig.width=8, fig.height=6,,dpi = 600, cache=TRUE}
 
 
-pdf("man_Kiitest.pdf",width=8, height=6)
+#pdf("man_Kiitest.pdf",width=8, height=6)
 
 ## semi-transparent colours
 col11 <- adjustcolor("black", alpha.f = 0.18)
