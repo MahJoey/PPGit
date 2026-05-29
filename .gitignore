@@ -25,3 +25,10 @@ id_ed25519*
 *.pem
 *.key
 .positai
+
+# allow CM boundary shapefile
+!0313Fri/CM_data/cm_boundary.shp
+!0313Fri/CM_data/cm_boundary.dbf
+!0313Fri/CM_data/cm_boundary.shx
+!0313Fri/CM_data/cm_boundary.prj
+!0313Fri/CM_data/cm_boundary.cpg
