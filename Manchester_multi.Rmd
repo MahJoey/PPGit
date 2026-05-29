@@ -139,7 +139,7 @@ for (i in seq_len(3)){
 
 dir.create("0313Fri/CM_data", showWarnings = FALSE)
 # save
-saveRDS(XSeverity_manCity, file = "0313Fri/CM_data/X_sub.rds")
+saveRDS(X_sub, file = "0313Fri/CM_data/X_sub.rds")
 
 
 # 取该对象的网络与窗口
@@ -203,7 +203,7 @@ legend("topleft",
 #dev.off()
 ```
 
-```{r linearKcross,  cache=TRUE, eval= run_heavy}
+```{r linearKcross,  cache=TRUE}
 X1 <- unmark(X_sub[[1]])
 X2 <- unmark(X_sub[[2]])
 X3 <- unmark(X_sub[[3]])
