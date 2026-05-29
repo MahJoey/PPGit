@@ -17,11 +17,6 @@
 *.fls
 *.fdb_latexmk
 
-*.shp
-*.dbf
-*.shx
-*.prj
-*.cpg
 
 data/private/
 data/raw/large/
