@@ -32,3 +32,11 @@ id_ed25519*
 !0313Fri/CM_data/cm_boundary.shx
 !0313Fri/CM_data/cm_boundary.prj
 !0313Fri/CM_data/cm_boundary.cpg
+
+# ignore large spatial data
+DataSet/
+0313Fri/Manchester/
+0313Fri/gadm41_GBR_shp/
+gadm41_AUS/
+gadm41_GBR/
+Manchester/
