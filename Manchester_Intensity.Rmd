@@ -183,6 +183,7 @@ if (!exists("X_sub")) {
 
 severity_labs <- c("Severity 1(Lower)", "Severity 2", "Severity 3(Higher)")
 severity_cols <- c("red", "blue", "green")
+#severity_cols <- c("#E69F00", "#0072B2", "#CC79A7")
 
 sigma_m <- 250
 
@@ -199,8 +200,8 @@ for (i in seq_along(X_sub)) {
   )
 }
 
-pdf("test.pdf",width=15, height=10)
-op <- par(mfrow = c(2, 3), mar = c(1, 1, 3, 1))
+#pdf("test.pdf",width=15, height=10)
+#op <- par(mfrow = c(6, 2), mar = c(0.5, 0.5, 2, 0.5))
 
 for (i in seq_along(lambda_sub)) {
   plot(
@@ -209,17 +210,25 @@ for (i in seq_along(lambda_sub)) {
     main = paste0(severity_labs[i], ": kernel intensity, sigma = ", sigma_m, "m")
   )
   plot(
+    lambda_sub[[i]],
+    add = FALSE, 
+    style = "w",
+    main = paste0(severity_labs[i], ": kernel intensity, sigma = ", sigma_m, "m")
+  )
+  plot(
     as.ppp(X_sub[[i]]),
     add = TRUE,
     cols = severity_cols[i],
     pch = 16,
-    cex = 0.35
+    cex = 0.5
   )
 }
-
+#par(op)
 ###############change the sigma
 
 sigma_m <- 500
+
+#op <- par(mfrow = c(6, 2), mar = c(0.5, 0.5, 2, 0.5))
 
 lambda_sub <- vector("list", length(X_sub))
 for (i in seq_along(X_sub)) {
@@ -240,14 +249,61 @@ for (i in seq_along(lambda_sub)) {
     main = paste0(severity_labs[i], ": kernel intensity, sigma = ", sigma_m, "m")
   )
   plot(
+    lambda_sub[[i]],
+    add = FALSE, 
+    style = "w",
+    main = paste0(severity_labs[i], ": kernel intensity, sigma = ", sigma_m, "m")
+  )
+  plot(
     as.ppp(X_sub[[i]]),
     add = TRUE,
     cols = severity_cols[i],
     pch = 16,
-    cex = 0.35
+    cex = 0.5
   )
 }
 
-par(op)
-dev.off()
+#par(op)
+#dev.off()
+```
+
+```{r}
+class(X_sub[[1]])
+getS3method("density", "lpp")
+args(getS3method("density", "lpp"))
+```
+
+```{r Compare with Voronoi,fig.width=8, fig.height=6,,dpi = 600}
+
+lambda_vor <- vector("list", length(X_sub))
+for (i in seq_along(X_sub)) {
+  lambda_vor[[i]] <- densityVoronoi(
+    X_sub[[i]],
+    f = 1,
+    metric = "shortestpath",
+    verbose = FALSE
+  )
+}
+
+for (i in seq_along(lambda_sub)){
+  plot(
+    lambda_vor[[i]],
+    
+    main = "Voronoi intensity on linear network"
+  )
+  plot(
+    lambda_vor[[i]],
+    add = FALSE, 
+    style = "w",
+    main = "Voronoi intensity on linear network"
+  )
+  plot(
+    as.ppp(X_sub[[i]]),
+    add = TRUE,
+    pch = 16,
+    cols = severity_cols[i],
+    cex = 0.5
+  )
+}
+
 ```
