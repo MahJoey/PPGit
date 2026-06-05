@@ -176,7 +176,7 @@ par(op)
 #dev.off()
 ```
 
-```{r IntensityEstimating, fig.width=8, fig.height=6,,dpi = 600}
+```{r IntensityEstimating, fig.width=12, fig.height=8,dpi = 600}
 if (!exists("X_sub")) {
   X_sub <- readRDS("0313Fri/CM_data/X_sub.rds")
 }
@@ -273,7 +273,7 @@ getS3method("density", "lpp")
 args(getS3method("density", "lpp"))
 ```
 
-```{r Compare with Voronoi,fig.width=8, fig.height=6,,dpi = 600}
+```{r Compare with Voronoi,fig.width=12, fig.height=8,dpi = 600}
 
 lambda_vor <- vector("list", length(X_sub))
 for (i in seq_along(X_sub)) {
