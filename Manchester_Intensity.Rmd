@@ -122,7 +122,7 @@ pts_27700 <- st_as_sf(pts, coords = c("lon","lat"), crs = 4326) |>
 #  points under projection 27700 （Easting, Northing）
 cbind(pts["name"], st_coordinates(pts_27700))
 
-pts_27700
+# pts_27700
 ```
 
 ```{r subnetwork, fig.width=8, fig.height=6,,dpi = 600}
@@ -174,6 +174,100 @@ plot(sb, add = TRUE)
 par(op)
 
 #dev.off()
+```
+
+```{r K23Analysis,fig.width=12, fig.height=8,dpi = 600, cache=TRUE}
+cols <- adjustcolor(grDevices::hcl.colors(3, "Dark 3"), alpha.f = 0.2)
+cols <- c("red","blue","green")
+
+r_grid <- seq(0, 2000, length = 50) # meter
+
+for(i in seq_len(3)){
+  
+  if (i==1){
+    Kb <- Knet(X_sub[[i]], r = r_grid)
+    #pdf("man_K_1.pdf",width=8, height=6)
+    plot(Kb, legend = FALSE, lwd = 2, col = cols[i], main = "")
+  }
+  else if(i==2){
+    Kb <- Knet(X_sub[[i]], r = r_grid)
+    K2 <- Kb
+    lines(Kb$r, Kb$est, lty=1, col = cols[i])
+    
+  }
+  else {
+    Kb <- Knet(X_sub[[i]], r = r_grid)
+    K3 <- Kb
+    lines(Kb$r, Kb$est, lty=1, col = cols[i])
+  }
+}
+
+legend("topleft",
+       legend = paste0("Severity=", 1:3),
+       col = cols, lwd = 2, bty = "n")
+
+#dev.off()
+d2 <- K2$est - K2$r
+d3 <- K3$est - K3$r
+```
+
+```{r ,fig.width=12, fig.height=8,dpi = 600, cache=TRUE}
+
+plot(K2$r, d2, type = "l", legend = FALSE, lwd = 2, col = cols[2], main = "d-r")
+lines(K2$r, d3, lty=1, col = cols[3])
+```
+
+```{r K23_random_labelling, fig.width=8, fig.height=5, dpi=600, cache=TRUE}
+
+B <- 10
+
+X1 <- unmark(X_sub[[1]])
+X2 <- unmark(X_sub[[2]])
+X3 <- unmark(X_sub[[3]])
+
+Y <- superimpose(sev2 = X2, sev3 = X3)
+# make sure the marks are factors
+marks(Y) <- factor(marks(Y), levels = c("sev2","sev3"))
+
+table(marks(Y))
+
+D_obs <- K3$est - K2$est
+D_sim <- matrix(NA_real_, nrow = length(r_grid), ncol = B)
+
+for (i in seq_len(B)){
+  m <- sample(marks(Y))
+  K2_b <- Knet(unmark(Y[m == "sev2"]), r = r_grid)
+  K3_b <- Knet(unmark(Y[m == "sev3"]), r = r_grid)
+  D_sim[, i] <- K3_b$est - K2_b$est
+}
+
+qts <- apply(D_sim, 1, quantile, probs = c(0.025, 0.975), na.rm = TRUE)
+
+```
+
+```{r K23_random_labellingplot, fig.width=8, fig.height=5, dpi=600, cache=TRUE}
+
+plot(
+  NULL,
+  xlab = 'r',
+  ylab = 'D32',
+  xlim = range(r_grid),
+  ylim = range(c(qts, D_obs), na.rm = TRUE)
+)
+
+polygon(
+  c(r_grid, rev(r_grid)),
+  c(qts[1, ], rev(qts[2, ])),
+  col = adjustcolor("grey70", alpha.f = 0.5),
+  border = NA
+)
+
+abline(h = 0, lty = 2, col = "grey50")
+lines(r_grid, D_obs, lwd = 2, col = "black")
+
+K23 <- linearKcross(Y, i = "sev2", j = "sev3", r = r_grid)
+lines(r_grid, K23$est-K2$est, lwd = 2, col = cols[2])
+lines(r_grid, K23$est-K3$est, lwd = 2, col = cols[3])
 ```
 
 ```{r IntensityEstimating, fig.width=12, fig.height=8,dpi = 600}
@@ -273,33 +367,51 @@ getS3method("density", "lpp")
 args(getS3method("density", "lpp"))
 ```
 
-```{r Compare with Voronoi,fig.width=12, fig.height=8,dpi = 600}
+```{r Compare with Voronoi,fig.width=12, fig.height=8,dpi = 600, cache=TRUE}
 
 lambda_vor <- vector("list", length(X_sub))
 
 for (i in seq_along(X_sub)) {
   lambda_vor[[i]] <- densityVoronoi(
     X_sub[[i]],
-    f = 1,
+    f = 0.05,
     metric = "shortestpath",
+    nrep = 1000,
     verbose = FALSE
   )
 }
 
+```
+
+```{r Plot Voronoi,fig.width=12, fig.height=8,dpi = 600}
 
 for (i in seq_along(lambda_sub)){
+  
+  vals <- as.numeric(as.im(lambda_vor[[i]])$v)
+  vals <- vals[is.finite(vals)]
+  
+  zlim_i <- if (length(vals) > 0) {
+    as.numeric(quantile(vals, c(0.01, 0.99), na.rm = TRUE))
+  } else {
+    NULL
+  }
+  
+  
   plot(
     lambda_vor[[i]],
     leg.scale = 1000,
-    
-    main = "Voronoi intensity on linear network"
+    zlim = zlim_i,
+    main = paste0("Voronoi intensity for type ", i,
+                         ", n = ", npoints(X_sub[[i]]))
   )
   plot(
     lambda_vor[[i]],
+    zlim = zlim_i,
     add = FALSE, 
     style = "w",
     leg.scale = 1000,
-    main = "Voronoi intensity on linear network"
+    main = paste0("Voronoi intensity for type ", i,
+                  ", n = ", npoints(X_sub[[i]]))
   )
   plot(
     as.ppp(X_sub[[i]]),
@@ -309,5 +421,4 @@ for (i in seq_along(lambda_sub)){
     cex = 0.5
   )
 }
-
 ```
