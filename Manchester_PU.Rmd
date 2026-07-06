@@ -101,6 +101,7 @@ seg <- data.frame(
   degree_mean = (degree_from + degree_to) / 2,
   dangling = as.integer(degree_from == 1 | degree_to == 1)
 )
+
 ```
 
 ```{r pu-counts}
@@ -131,5 +132,182 @@ naive_fit <- glm(
   family = binomial()
 )
 
+seg$naive_score <- predict(naive_fit, newdata = seg, type = "response")
+
+u_rows <- which(seg$S == 0)
+rn_cut <- quantile(seg$naive_score[u_rows], probs = 0.25, na.rm = TRUE)
+
+seg$reliable_negative <- seg$S == 0 & seg$naive_score <= rn_cut
+
+train_rows <- seg$S == 1 | seg$reliable_negative
+
+pu_fit <- glm(
+  pu_formula,
+  data = seg[train_rows, ],
+  family = binomial()
+)
+
+seg$pu_score <- predict(pu_fit, newdata = seg, type = "response")
+seg$pi_support <- ifelse(seg$S == 1, 1, pmax(seg$pu_score, 0.01))
+
+cat("Reliable negative cut:", round(rn_cut, 4), "\n")
+cat("Number of reliable negatives:", sum(seg$reliable_negative), "\n")
+cat("Number of training rows:", sum(train_rows), "\n")
+
+```
+
+```{r model-coefficients}
+coef_table <- data.frame(
+  term = names(coef(pu_fit)),
+  estimate = as.numeric(coef(pu_fit))
+)
+
+kable(coef_table, digits = 4)
+```
+
+```{r score-summary}
+label_values <- sort(unique(seg$label))
+score_summary <- data.frame(
+  label = label_values,
+  n = NA_integer_,
+  mean_pi = NA_real_,
+  q10_pi = NA_real_,
+  q50_pi = NA_real_,
+  q90_pi = NA_real_
+)
+
+for (i in seq_along(label_values)) {
+  keep <- seg$label == label_values[i]
+  pi_i <- seg$pi_support[keep]
+  score_summary$n[i] <- sum(keep)
+  score_summary$mean_pi[i] <- mean(pi_i)
+  score_summary$q10_pi[i] <- quantile(pi_i, 0.10)
+  score_summary$q50_pi[i] <- quantile(pi_i, 0.50)
+  score_summary$q90_pi[i] <- quantile(pi_i, 0.90)
+}
+
+kable(score_summary, digits = 3)
+```
+
+```{r support-map, fig.width=8, fig.height=6.5}
+
+score_palette <- colorRampPalette(c("#c63d35", "#f2b533", "#2e8b57"))(100)
+score_index <- pmax(1, pmin(100, ceiling(seg$pi_support * 100)))
+segment_col <- score_palette[score_index]
+
+op <- par(mar = c(1, 1, 3, 1))
+plot(
+  as.psp(L),
+  col = segment_col,
+  lwd = 1.05,
+  main = "PU support score on Manchester X_sub network"
+)
+plot(as.ppp(unmark(X)), add = TRUE, pch = 16, cex = 0.22, col = "black")
+legend(
+  "topleft",
+  legend = c("low support", "middle support", "high support", "accident point"),
+  col = c("#c63d35", "#f2b533", "#2e8b57", "black"),
+  lwd = c(3, 3, 3, NA),
+  pch = c(NA, NA, NA, 16),
+  bty = "n"
+)
+par(op)
+```
+
+```{r plot-input}
+# Optional Step: 5-fold cross validation by accident points
+
+K <- 5
+
+event_seg <- as.data.frame(X)$seg
+event_seg <- event_seg[!is.na(event_seg)]
+
+event_fold <- sample(rep(seq_len(K), length.out = length(event_seg)))
+
+point_cv <- data.frame(
+  fold = seq_len(K),
+  n_train_points = NA_integer_,
+  n_heldout_points = NA_integer_,
+  n_hidden_points = NA_integer_,
+  mean_score_all_heldout = NA_real_,
+  mean_score_hidden_only = NA_real_,
+  mean_score_original_U = NA_real_
+)
+
+for (k in seq_len(K)) {
+  train_event_seg <- event_seg[event_fold != k]
+  heldout_event_seg <- event_seg[event_fold == k]
+  
+  accident_count_train <- tabulate(
+    train_event_seg,
+    nbins = nsegments(L)
+  )
+  
+  seg_cv <- seg
+  seg_cv$S_train <- as.integer(accident_count_train > 0)
+  
+  pu_formula_cv <- S_train ~ log_length + degree_mean + dangling
+  
+  naive_fit_cv <- glm(
+    pu_formula_cv,
+    data = seg_cv,
+    family = binomial()
+  )
+  
+  seg_cv$naive_score_cv <- predict(
+    naive_fit_cv,
+    newdata = seg_cv,
+    type = "response"
+  )
+  
+  u_rows_cv <- which(seg_cv$S_train == 0)
+  rn_cut_cv <- quantile(
+    seg_cv$naive_score_cv[u_rows_cv],
+    probs = 0.25,
+    na.rm = TRUE
+  )
+  
+  seg_cv$reliable_negative_cv <- 
+    seg_cv$S_train == 0 & seg_cv$naive_score_cv <= rn_cut_cv
+  
+  train_rows_cv <- seg_cv$S_train == 1 | seg_cv$reliable_negative_cv
+  
+  pu_fit_cv <- glm(
+    pu_formula_cv,
+    data = seg_cv[train_rows_cv, ],
+    family = binomial()
+  )
+  
+  seg_cv$pu_score_cv <- predict(
+    pu_fit_cv,
+    newdata = seg_cv,
+    type = "response"
+  )
+  
+  seg_cv$pi_support_cv <- ifelse(
+    seg_cv$S_train == 1,
+    1,
+    pmax(seg_cv$pu_score_cv, 0.01)
+  )
+  
+  heldout_scores <- seg_cv$pi_support_cv[heldout_event_seg]
+  
+  hidden_keep <- seg_cv$S_train[heldout_event_seg] == 0
+  hidden_scores <- heldout_scores[hidden_keep]
+  
+  original_u_scores <- seg_cv$pi_support_cv[seg$S == 0]
+  
+  point_cv$n_train_points[k] <- length(train_event_seg)
+  point_cv$n_heldout_points[k] <- length(heldout_event_seg)
+  point_cv$n_hidden_points[k] <- sum(hidden_keep)
+  point_cv$mean_score_all_heldout[k] <- mean(heldout_scores)
+  point_cv$mean_score_original_U[k] <- mean(original_u_scores)
+  
+  if (length(hidden_scores) > 0) {
+    point_cv$mean_score_hidden_only[k] <- mean(hidden_scores)
+  }
+}
+
+kable(point_cv, digits = 3)
 
 ```
