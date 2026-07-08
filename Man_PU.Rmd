@@ -1,0 +1,173 @@
+---
+title: "Manchester X_sub PU Learning"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  cache = TRUE,
+  warning = FALSE,
+  fig.width = 8,
+  fig.height = 6,
+  dpi = 300
+)
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+candidate_roots <- c(
+  normalizePath(".", mustWork = FALSE),
+  normalizePath(file.path("..", ".."), mustWork = FALSE)
+)
+project_root <- candidate_roots[
+  file.exists(file.path(candidate_roots, "data/processed/X_sub.rds"))
+][1]
+knitr::opts_knit$set(root.dir = project_root)
+
+```
+
+```{r packages}
+library(spatstat.geom)
+library(spatstat.linnet)
+library(knitr)
+
+
+x_sub_path <- "0313Fri/CM_data/X_sub.rds"
+
+out_dir <- "PU/results"
+
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+```
+
+```{r load-data}
+X_sub <- readRDS(x_sub_path)
+
+L <- domain(X_sub[[1]])
+
+xy_all <- data.frame()
+for (i in seq_len(length(X_sub))) {
+  xy_i <- as.data.frame(X_sub[[i]])[, c("x", "y")]
+  xy_i$severity <- i
+  xy_all <- rbind(xy_all, xy_i)
+}
+
+X <- as.lpp(
+  x = xy_all$x,
+  y = xy_all$y,
+  L = L
+)
+marks(X) <- data.frame(severity = xy_all$severity)
+
+npoints(X)
+nsegments(L)
+round(volume(L), 2)
+```
+
+```{r manchester-map}
+op <- par(mfrow = c(1, 2), mar = c(1, 1, 2, 1))
+plot(
+  L,
+  main = "Manchester X_sub: road network and accident points",
+  col = "grey75",
+  lwd = 0.45
+)
+plot(as.ppp(unmark(X)), add = TRUE, pch = 16, cex = 0.28, col = "red")
+
+plot(L, main="Accident with different severity on Manchester city center", col="grey70", lwd=0.4)
+
+
+plot(as.ppp(X_sub[[3]]), add=TRUE, cols="green", pch=16, cex=0.5)
+plot(as.ppp(X_sub[[2]]), add=TRUE, cols="blue", pch=16, cex=0.5)
+plot(as.ppp(X_sub[[1]]), add=TRUE, cols="red", pch=16, cex=0.5)
+
+par(op)
+
+op <- par(mar = c(1, 1, 2, 1))
+plot(
+  L,
+  main = "Manchester X_sub: road network and accident points",
+  col = "grey75",
+  lwd = 0.45
+)
+plot(as.ppp(unmark(X)), add = TRUE, pch = 16, cex = 0.28, col = "red")
+par(op)
+```
+
+```{r build-segment-data}
+road_lines <- as.psp(L)
+
+segment_id_at_events <- as.data.frame(X)$seg
+accident_count <- tabulate(segment_id_at_events, nbins = nsegments(L))
+
+segment_length <- lengths_psp(road_lines)
+vertex_degree <- vertexdegree(L)
+
+S <- as.integer(accident_count > 0)
+degree_from <- vertex_degree[L$from]
+degree_to <- vertex_degree[L$to]
+
+seg <- data.frame(
+  seg_id = seq_len(nsegments(L)),
+  S = S,
+  label = ifelse(S == 1, "P", "U"),
+  length_m = segment_length,
+  log_length = log1p(segment_length),
+  degree_mean = (degree_from + degree_to) / 2,
+  dangling = as.integer(degree_from == 1 | degree_to == 1)
+)
+
+```
+
+```{r pu-counts}
+label_values <- sort(unique(seg$label))
+pu_count <- data.frame(
+  label = label_values,
+  n_segments = NA_integer_,
+  total_length_m = NA_real_,
+  mean_length_m = NA_real_
+)
+
+for (i in seq_along(label_values)) {
+  keep <- seg$label == label_values[i]
+  pu_count$n_segments[i] <- sum(keep)
+  pu_count$total_length_m[i] <- sum(seg$length_m[keep])
+  pu_count$mean_length_m[i] <- mean(seg$length_m[keep])
+}
+
+kable(pu_count, digits = 2)
+```
+
+```{r fit two-step-pu}
+pu_formula <- S ~ log_length + degree_mean + dangling
+
+naive_fit <- glm(
+  pu_formula,
+  data = seg,
+  family = binomial()
+)
+
+seg$naive_score <- predict(naive_fit, newdata = seg, type = "response")
+
+u_rows <- which(seg$S == 0)
+rn_cut <- quantile(seg$naive_score[u_rows], probs = 0.25, na.rm = TRUE)
+
+seg$reliable_negative <- seg$S == 0 & seg$naive_score <= rn_cut
+
+train_rows <- seg$S == 1 | seg$reliable_negative
+
+pu_fit <- glm(
+  pu_formula,
+  data = seg[train_rows, ],
+  family = binomial()
+)
+
+seg$pu_score <- predict(pu_fit, newdata = seg, type = "response")
+seg$pi_support <- ifelse(seg$S == 1, 1, pmax(seg$pu_score, 0.01))
+
+cat("Reliable negative cut:", round(rn_cut, 4), "\n")
+cat("Number of reliable negatives:", sum(seg$reliable_negative), "\n")
+cat("Number of training rows:", sum(train_rows), "\n")
+
+```
