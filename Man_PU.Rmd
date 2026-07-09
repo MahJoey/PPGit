@@ -348,3 +348,12 @@ for (i in seq_along(lambda_sub_new)) {
 
 par(op)
 ```
+
+```{r sp-t}
+#######-----superposition-thinning
+
+
+#######-------generated-from-reducedroad
+
+
+```
