@@ -267,7 +267,7 @@ for (i in seq_along(X_sub)) {
 }
 
 #pdf("test.pdf",width=15, height=10)
-op <- par(mfrow = c(2, 2), mar = c(0.5, 0.5, 2, 0.5))
+op <- par(mfrow = c(3, 2), mar = c(0.5, 0.5, 2, 0.5))
 
 for (i in seq_along(lambda_sub)) {
   plot(
@@ -286,13 +286,13 @@ for (i in seq_along(lambda_sub)) {
     add = TRUE,
     cols = severity_cols[i],
     pch = 16,
-    cex = 0.5
+    cex = 0.3
   )
 }
 
 ############### PU-CUTOFF ##############
 
-cutoff <- quantile(seg$pi_support, 0.8)
+cutoff <- quantile(seg$pi_support, 0.5)
 keep_seg <- which(seg$pi_support >= cutoff)
 L_sub <- thinNetwork(
   L,
@@ -341,7 +341,7 @@ for (i in seq_along(lambda_sub_new)) {
     add = TRUE,
     cols = severity_cols[i],
     pch = 16,
-    cex = 0.5
+    cex = 0.3
   )
 }
 
