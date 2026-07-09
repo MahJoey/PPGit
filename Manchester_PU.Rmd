@@ -308,6 +308,6 @@ for (k in seq_len(K)) {
   }
 }
 
-kable(point_cv, digits = 3)
+point_cv
 
 ```

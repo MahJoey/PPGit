@@ -13,18 +13,13 @@ knitr::opts_chunk$set(
   message = FALSE,
   fig.width = 8,
   fig.height = 6,
-  dpi = 300
+  dpi = 600
 )
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
-candidate_roots <- c(
-  normalizePath(".", mustWork = FALSE),
-  normalizePath(file.path("..", ".."), mustWork = FALSE)
-)
-project_root <- candidate_roots[
-  file.exists(file.path(candidate_roots, "data/processed/X_sub.rds"))
-][1]
+
+project_root <- getwd()
 knitr::opts_knit$set(root.dir = project_root)
 
 ```
@@ -152,7 +147,7 @@ naive_fit <- glm(
 seg$naive_score <- predict(naive_fit, newdata = seg, type = "response")
 
 u_rows <- which(seg$S == 0)
-rn_cut <- quantile(seg$naive_score[u_rows], probs = 0.25, na.rm = TRUE)
+rn_cut <- quantile(seg$naive_score[u_rows], probs = 0.1, na.rm = TRUE)
 
 seg$reliable_negative <- seg$S == 0 & seg$naive_score <= rn_cut
 
@@ -165,7 +160,9 @@ pu_fit <- glm(
 )
 
 seg$pu_score <- predict(pu_fit, newdata = seg, type = "response")
-seg$pi_support <- ifelse(seg$S == 1, 1, pmax(seg$pu_score, 0.01))
+seg$pi_support <- ifelse(seg$S == 1, 1, 
+                         pmax(seg$pu_score,
+                              min(seg$pu_score[seg$pu_score > 0], na.rm = TRUE)))
 
 cat("Reliable negative cut:", round(rn_cut, 4), "\n")
 cat("Number of reliable negatives:", sum(seg$reliable_negative), "\n")
@@ -182,7 +179,7 @@ coef_table
 
 ```
 
-```{r score-summary}
+```{r score-summary, include=FALSE}
 label_values <- sort(unique(seg$label))
 score_summary <- data.frame(
   label = label_values,
@@ -208,7 +205,8 @@ score_summary
 
 ```{r support-map, fig.width=8, fig.height=6.5}
 
-score_palette <- colorRampPalette(c("#c63d35", "#f2b533", "#2e8b57"))(100)
+#score_palette <- colorRampPalette(c("#c63d35", "#f2b533", "#2e8b57"))(100)
+score_palette <- colorRampPalette(c("red", "yellow", "green"))(100)
 score_index <- pmax(1, pmin(100, ceiling(seg$pi_support * 100)))
 segment_col <- score_palette[score_index]
 
@@ -220,13 +218,133 @@ plot(
   main = "PU support score on Manchester X_sub network"
 )
 plot(as.ppp(unmark(X)), add = TRUE, pch = 16, cex = 0.22, col = "black")
+
 legend(
   "topleft",
   legend = c("low support", "middle support", "high support", "accident point"),
-  col = c("#c63d35", "#f2b533", "#2e8b57", "black"),
+  #col = c("#c63d35", "#f2b533", "#2e8b57", "black"),
+  col = c("red", "yellow", "green", "black"),
   lwd = c(3, 3, 3, NA),
   pch = c(NA, NA, NA, 16),
   bty = "n"
 )
+par(op)
+
+
+op <- par(mar = c(1, 1, 2, 1))
+plot(
+  L,
+  main = "Manchester X_sub: road network and accident points",
+  col = "grey75",
+  lwd = 0.45
+)
+plot(as.ppp(unmark(X)), add = TRUE, pch = 16, cex = 0.28, col = "red")
+par(op)
+```
+
+```{r intensity}
+if (!exists("X_sub")) {
+  X_sub <- readRDS("0313Fri/CM_data/X_sub.rds")
+}
+
+severity_labs <- c("Severity 1(Lower)", "Severity 2", "Severity 3(Higher)")
+severity_cols <- c("red", "blue", "green")
+#severity_cols <- c("#E69F00", "#0072B2", "#CC79A7")
+
+sigma_m <- 250
+
+lambda_sub <- vector("list", length(X_sub))
+for (i in seq_along(X_sub)) {
+  lambda_sub[[i]] <- density(
+    X_sub[[i]],
+    sigma = sigma_m,
+    distance = "path",
+    continuous = TRUE,
+    kernel = "gaussian",
+    finespacing = FALSE,
+    verbose = FALSE
+  )
+}
+
+#pdf("test.pdf",width=15, height=10)
+op <- par(mfrow = c(2, 2), mar = c(0.5, 0.5, 2, 0.5))
+
+for (i in seq_along(lambda_sub)) {
+  plot(
+    lambda_sub[[i]],
+    
+    main = paste0(severity_labs[i], ": kernel intensity, sigma = ", sigma_m, "m")
+  )
+  plot(
+    lambda_sub[[i]],
+    add = FALSE, 
+    style = "w",
+    main = paste0(severity_labs[i], ": kernel intensity, sigma = ", sigma_m, "m")
+  )
+  plot(
+    as.ppp(X_sub[[i]]),
+    add = TRUE,
+    cols = severity_cols[i],
+    pch = 16,
+    cex = 0.5
+  )
+}
+
+############### PU-CUTOFF ##############
+
+cutoff <- quantile(seg$pi_support, 0.8)
+keep_seg <- which(seg$pi_support >= cutoff)
+L_sub <- thinNetwork(
+  L,
+  retainedges = keep_seg
+)
+
+
+df <- as.data.frame(X_sub[[i]])
+
+X_sub_new <- vector("list", length(X_sub))
+
+for (i in seq_along(X_sub)) {
+  X_sub_new[[i]] <- thinNetwork(
+    X_sub[[i]],
+    retainedges = keep_seg
+  )
+}
+
+lambda_sub_new <- vector("list", length(X_sub_new))
+for (i in seq_along(X_sub_new)) {
+  lambda_sub_new[[i]] <- density(
+    X_sub_new[[i]],
+    sigma = sigma_m,
+    distance = "path",
+    continuous = TRUE,
+    kernel = "gaussian",
+    finespacing = FALSE,
+    verbose = FALSE
+  )
+}
+
+for (i in seq_along(lambda_sub_new)) {
+  plot(
+    lambda_sub_new[[i]],
+    
+    main = paste0(severity_labs[i], ":Sub kernel intensity, sigma = ", sigma_m, "m")
+  )
+  plot(
+    lambda_sub_new[[i]],
+    add = FALSE, 
+    style = "w",
+    main = paste0(severity_labs[i], ":Sub kernel intensity, sigma = ", sigma_m, "m")
+  )
+  plot(
+    as.ppp(X_sub_new[[i]]),
+    add = TRUE,
+    cols = severity_cols[i],
+    pch = 16,
+    cex = 0.5
+  )
+}
+
+
 par(op)
 ```
