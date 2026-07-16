@@ -98,6 +98,7 @@ round(volume(L), 2)
 ```
 
 ```{r L_sub}
+
 road_lines <- as.psp(L)
 
 segment_id_at_events <- as.data.frame(X)$seg
@@ -118,6 +119,7 @@ L_sub <- thinNetwork(L, retainedges = p_seg)
 ```
 
 ```{r simulation1}
+
 X_random <- vector ("list", 3)
 
 for (i in seq_len(3)) {
@@ -160,18 +162,19 @@ for(i in seq_len(3)){
 }
 
 legend("topleft",
-       legend = paste0("Severity=", 1:3),
+       legend = paste0("SimNo=", 1:3),
        col = cols, lwd = 2, bty = "n")
 
 #par(op)
 ```
 
-```{r Kcross_Xrandom}
+```{r Sim1-Kcross_Xrandom}
 X_random_multi <- superimpose(
   sev1 = unmark(X_random[[1]]),
   sev2 = unmark(X_random[[2]]),
   sev3 = unmark(X_random[[3]])
 )
+X_random_label <- X_random_multi #for random label
 
 marks(X_random_multi) <- factor(
   marks(X_random_multi),
@@ -247,6 +250,141 @@ legend(
 par(op)
 ```
 
+```{r Sim1RandomLabel}
+#####################Random Labelling########
+X_base <- X_random_multi
+
+severity_levels <- c("sev1", "sev2", "sev3")
+
+marks(X_base) <- factor(
+  marks(X_base),
+  levels = severity_levels
+)
+
+# Observed cross-K functions before randomising the labels
+K12_obs <- linearKcross(X_base, i = "sev1", j = "sev2", r = r_grid)
+K13_obs <- linearKcross(X_base, i = "sev1", j = "sev3", r = r_grid)
+K23_obs <- linearKcross(X_base, i = "sev2", j = "sev3", r = r_grid)
+
+# Number of random-labelling simulations
+B <- 10
+
+K12_sim <- matrix(NA_real_, nrow = length(r_grid), ncol = B)
+K13_sim <- matrix(NA_real_, nrow = length(r_grid), ncol = B)
+K23_sim <- matrix(NA_real_, nrow = length(r_grid), ncol = B)
+
+
+for (b in seq_len(B)) {
+  
+  # Copy the locations, then shuffle only their labels
+  X_random_label <- X_base
+  
+  random_marks <- sample(
+    as.character(marks(X_base)),
+    size = npoints(X_base),
+    replace = FALSE
+  )
+  
+  marks(X_random_label) <- factor(
+    random_marks,
+    levels = severity_levels
+  )
+  
+  K12_b <- linearKcross(
+    X_random_label,
+    i = "sev1",
+    j = "sev2",
+    r = r_grid
+  )
+  
+  K13_b <- linearKcross(
+    X_random_label,
+    i = "sev1",
+    j = "sev3",
+    r = r_grid
+  )
+  
+  K23_b <- linearKcross(
+    X_random_label,
+    i = "sev2",
+    j = "sev3",
+    r = r_grid
+  )
+  
+  K12_sim[, b] <- K12_b$est
+  K13_sim[, b] <- K13_b$est
+  K23_sim[, b] <- K23_b$est
+}
+
+# 95% pointwise envelopes
+K12_env <- apply(K12_sim, 1, quantile, probs = c(0.025, 0.975))
+K13_env <- apply(K13_sim, 1, quantile, probs = c(0.025, 0.975))
+K23_env <- apply(K23_sim, 1, quantile, probs = c(0.025, 0.975))
+```
+
+```{r Sim1-Plot}
+op <- par(mfrow = c(1, 1), mar = c(4, 4, 2, 1))
+
+plot(
+  NULL,
+  xlim = range(r_grid),
+  ylim = range(K12_env, K12_obs$est),
+  xlab = "Network distance r (m)",
+  ylab = expression(K[12](r)),
+  main = "Random labelling: 1 vs 2"
+)
+
+polygon(
+  c(r_grid, rev(r_grid)),
+  c(K12_env[1, ], rev(K12_env[2, ])),
+  col = adjustcolor("grey70", alpha.f = 0.5),
+  border = NA
+)
+
+lines(K12_obs$r, K12_obs$est, lwd = 2, col = "purple")
+lines(K12_obs$r, K12_obs$theo, lty = 2, col = "gray40")
+
+plot(
+  NULL,
+  xlim = range(r_grid),
+  ylim = range(K13_env, K13_obs$est),
+  xlab = "Network distance r (m)",
+  ylab = expression(K[13](r)),
+  main = "Random labelling: 1 vs 3"
+)
+
+polygon(
+  c(r_grid, rev(r_grid)),
+  c(K13_env[1, ], rev(K13_env[2, ])),
+  col = adjustcolor("grey70", alpha.f = 0.5),
+  border = NA
+)
+
+lines(K13_obs$r, K13_obs$est, lwd = 2, col = "orange")
+lines(K13_obs$r, K13_obs$theo, lty = 2, col = "gray40")
+
+plot(
+  NULL,
+  xlim = range(r_grid),
+  ylim = range(K23_env, K23_obs$est),
+  xlab = "Network distance r (m)",
+  ylab = expression(K[23](r)),
+  main = "Random labelling: 2 vs 3"
+)
+
+polygon(
+  c(r_grid, rev(r_grid)),
+  c(K23_env[1, ], rev(K23_env[2, ])),
+  col = adjustcolor("grey70", alpha.f = 0.5),
+  border = NA
+)
+
+lines(K23_obs$r, K23_obs$est, lwd = 2, col = "darkgreen")
+lines(K23_obs$r, K23_obs$theo, lty = 2, col = "gray40")
+
+par(op)
+```
+
 ```{r simulation2}
 X_Lsub <- vector ("list", 3)
 
@@ -303,4 +441,85 @@ legend("topleft",
        col = cols, lwd = 2, bty = "n")
 
 #par(op)
+```
+
+```{r Sim2-Kcross_XLsub}
+X_Lsub_multi <- superimpose(
+  sev1 = unmark(XLsub_on_L[[1]]),
+  sev2 = unmark(XLsub_on_L[[2]]),
+  sev3 = unmark(XLsub_on_L[[3]])
+)
+
+marks(X_Lsub_multi) <- factor(
+  marks(X_Lsub_multi),
+  levels = c("sev1", "sev2", "sev3")
+)
+
+table(marks(X_Lsub_multi))
+
+K12_Lsub <- linearKcross(
+  X_Lsub_multi,
+  i = "sev1",
+  j = "sev2",
+  r = r_grid
+)
+
+K13_Lsub <- linearKcross(
+  X_Lsub_multi,
+  i = "sev1",
+  j = "sev3",
+  r = r_grid
+)
+
+K23_Lsub <- linearKcross(
+  X_Lsub_multi,
+  i = "sev2",
+  j = "sev3",
+  r = r_grid
+)
+
+# Plot the three cross-K functions
+op <- par(mar = c(4, 4, 2, 1))
+
+ylim_cross <- range(
+  K12_Lsub$est,
+  K13_Lsub$est,
+  K23_Lsub$est,
+  K12_Lsub$theo
+)
+
+plot(
+  K12_Lsub$r,
+  K12_Lsub$est,
+  type = "l",
+  lwd = 2,
+  col = "purple",
+  xlab = "Network distance r (m)",
+  ylab = expression(K[cross](r)),
+  main = "Cross-K: random severity types",
+  ylim = ylim_cross
+)
+
+lines(K13_Lsub$r, K13_Lsub$est, lwd = 2, col = "orange")
+lines(K23_Lsub$r, K23_Lsub$est, lwd = 2, col = "darkgreen")
+
+
+lines(
+  K12_Lsub$r,
+  K12_Lsub$theo,
+  lty = 2,
+  col = "grey40"
+)
+
+legend(
+  "topleft",
+  legend = c("K12_Lsub", "K13_Lsub",
+             "K23_Lsub", "Homogeneous Pois: r"),
+  col = c("purple", "orange", "darkgreen", "grey40"),
+  lwd = c(2, 2, 2, 1),
+  lty = c(1, 1, 1, 2),
+  bty = "n"
+)
+
+par(op)
 ```
